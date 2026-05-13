@@ -1,0 +1,122 @@
+{
+  "name": "INFRATEC CRM",
+  "short_name": "INFRATEC",
+  "description": "Sistema CRM con Agente IA Maestro para gestión de telecomunicaciones y seguridad",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#8b5cf6",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Hablar con Chami",
+      "short_name": "Chami",
+      "description": "Iniciar conversación con el Agente Maestro",
+      "url": "/?panel=config-agente",
+      "icons": [{ "src": "/icon-chami.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Nuevo Ticket",
+      "short_name": "Ticket",
+      "description": "Crear nuevo ticket de trabajo",
+      "url": "/?action=nuevo-ticket",
+      "icons": [{ "src": "/icon-ticket.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Clientes",
+      "short_name": "Clientes",
+      "description": "Ver lista de clientes",
+      "url": "/?panel=clientes",
+      "icons": [{ "src": "/icon-clientes.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Stock",
+      "short_name": "Stock",
+      "description": "Revisar inventario",
+      "url": "/?panel=stock",
+      "icons": [{ "src": "/icon-stock.png", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "photos",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  },
+  "prefer_related_applications": false
+}
