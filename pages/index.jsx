@@ -1,4 +1,7 @@
+'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { 
   LayoutDashboard, Users, Clipboard, Package, MapPin, DollarSign, 
   Settings, Bot, Bell, Search, Menu, X, Mic, MicOff, Volume2, VolumeX,
@@ -44,14 +47,21 @@ const THEMES = {
 };
 
 // ============================================================================
-// ESFERA 3D DE CHAMI (MEJORADA)
+// ESFERA 3D DE CHAMI (SOLO CLIENT-SIDE)
 // ============================================================================
-function ChamiSphere3D({ isListening, isSpeaking, theme }) {
+function ChamiSphere3DClient({ isListening, isSpeaking, theme }) {
   const canvasRef = useRef(null);
   const particlesRef = useRef([]);
   const animationRef = useRef(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -132,7 +142,11 @@ function ChamiSphere3D({ isListening, isSpeaking, theme }) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isListening, isSpeaking]);
+  }, [mounted, isListening, isSpeaking]);
+
+  if (!mounted) {
+    return <div className="w-full h-64 flex items-center justify-center bg-gray-800/30 rounded-xl" />;
+  }
 
   return (
     <div className="relative w-full h-64 flex items-center justify-center">
@@ -143,9 +157,9 @@ function ChamiSphere3D({ isListening, isSpeaking, theme }) {
 }
 
 // ============================================================================
-// PANEL DE CHAMI FLOTANTE MEJORADO
+// PANEL DE CHAMI FLOTANTE
 // ============================================================================
-function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
+function FloatingChamiPanelClient({ onToggle, isMinimized, theme, config }) {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -153,17 +167,26 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
     { role: 'assistant', content: '¡Hola! Soy Chami, tu asistente personal con IA. Tengo 4 conocimientos master en Administración, Marketing, Negocios Digitales y Community Management. ¿En qué puedo ayudarte?' }
   ]);
   const [inputMessage, setInputMessage] = useState('');
+  const [mounted, setMounted] = useState(false);
   const recognitionRef = useRef(null);
-  const synthRef = useRef(window.speechSynthesis);
+  const synthRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Inicializar Speech Recognition con wake word
+  // Inicializar Speech APIs solo en cliente
   useEffect(() => {
+    if (!mounted || typeof window === 'undefined') return;
+
+    synthRef.current = window.speechSynthesis;
+
     if ('webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
@@ -176,7 +199,6 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript.toLowerCase();
           if (event.results[i].isFinal) {
-            // Detectar wake word "chami"
             if (transcript.includes('chami')) {
               const command = transcript.replace('chami', '').trim();
               if (command) {
@@ -192,10 +214,16 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
 
       recognitionRef.current.onerror = () => setIsListening(false);
     }
-    return () => recognitionRef.current?.stop();
-  }, []);
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [mounted]);
 
   const speak = (text) => {
+    if (!mounted || typeof window === 'undefined') return;
     if (synthRef.current && !config.muted) {
       synthRef.current.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
@@ -203,7 +231,6 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
       utterance.rate = config.voiceSpeed || 1.0;
       utterance.pitch = config.voicePitch || 1.0;
       
-      // Seleccionar voz según configuración
       const voices = synthRef.current.getVoices();
       const selectedVoice = voices.find(v => 
         config.voiceGender === 'female' ? v.name.includes('female') || v.name.includes('mujer') :
@@ -218,11 +245,12 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
   };
 
   const toggleListening = () => {
+    if (!recognitionRef.current) return;
     if (isListening) {
-      recognitionRef.current?.stop();
+      recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      recognitionRef.current?.start();
+      recognitionRef.current.start();
       setIsListening(true);
     }
   };
@@ -231,7 +259,6 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
     const userMsg = { role: 'user', content: command };
     setMessages(prev => [...prev, userMsg]);
 
-    // Respuestas más naturales y contextuales
     setTimeout(() => {
       const responses = [
         `Dale, entiendo que querés ${command}. Déjame revisar eso para vos...`,
@@ -253,6 +280,8 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
     }
   };
 
+  if (!mounted) return null;
+
   if (isMinimized) {
     return (
       <div 
@@ -270,18 +299,17 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
       className="fixed bottom-6 right-6 w-[420px] bg-gray-900/95 backdrop-blur-xl rounded-2xl border-2 shadow-2xl z-50 overflow-hidden"
       style={{ borderColor: theme.glow, boxShadow: `0 0 60px ${theme.glow}` }}
     >
-      {/* Header */}
       <div className={`bg-gradient-to-r ${theme.primary} p-4`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                <Brain className={`w-7 h-7 text-${theme.accent}-600`} />
+                <Brain className={`w-7 h-7 text-cyan-600`} />
               </div>
               <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-gray-900 ${
                 isSpeaking ? 'bg-green-500 animate-pulse' : 
                 isListening ? 'bg-red-500 animate-pulse' : 
-                `bg-${theme.accent}-500`
+                'bg-cyan-500'
               }`} />
             </div>
             <div>
@@ -295,15 +323,13 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
         </div>
       </div>
 
-      {/* Esfera 3D */}
-      <ChamiSphere3D isListening={isListening} isSpeaking={isSpeaking} theme={theme} />
+      <ChamiSphere3DClient isListening={isListening} isSpeaking={isSpeaking} theme={theme} />
 
-      {/* Estado */}
       <div className="px-4 pb-2 text-center">
         <span className={`text-xs font-bold px-3 py-1 rounded-full ${
           isListening ? 'bg-red-500/20 text-red-300 animate-pulse' :
           isSpeaking ? 'bg-green-500/20 text-green-300 animate-pulse' :
-          `bg-${theme.accent}-500/20 text-${theme.accent}-300`
+          'bg-cyan-500/20 text-cyan-300'
         }`}>
           {isListening ? '🎤 ESCUCHANDO - Di "Chami" para activar' : 
            isSpeaking ? '🔊 HABLANDO' : 
@@ -311,7 +337,6 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
         </span>
       </div>
 
-      {/* Chat Messages */}
       <div className="h-64 overflow-y-auto px-4 py-2 space-y-3">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -327,7 +352,6 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <div className="p-4 border-t border-gray-700/50 space-y-2">
         {transcript && (
           <div className="px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg">
@@ -352,29 +376,33 @@ function FloatingChamiPanel({ onToggle, isMinimized, theme, config }) {
           </button>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={toggleListening}
-            className={`flex-1 py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
-              isListening 
-                ? 'bg-red-600 hover:bg-red-700 text-white' 
-                : `bg-gradient-to-r ${theme.primary} hover:opacity-80 text-white`
-            }`}
-          >
-            <Mic className="w-4 h-4" />
-            {isListening ? 'Detener' : 'Activar Escucha'}
-          </button>
-        </div>
+        <button
+          onClick={toggleListening}
+          className={`w-full py-2 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+            isListening 
+              ? 'bg-red-600 hover:bg-red-700 text-white' 
+              : `bg-gradient-to-r ${theme.primary} hover:opacity-80 text-white`
+          }`}
+        >
+          <Mic className="w-4 h-4" />
+          {isListening ? 'Detener' : 'Activar Escucha'}
+        </button>
       </div>
     </div>
   );
 }
 
+// Dynamic import con SSR disabled
+const FloatingChamiPanel = dynamic(
+  () => Promise.resolve(FloatingChamiPanelClient),
+  { ssr: false }
+);
+
 // ============================================================================
-// PANEL DE TICKETS LATERAL
+// OTROS COMPONENTES (Sin cambios necesarios)
 // ============================================================================
 function TicketsPanel({ isOpen, onClose, theme }) {
-  const [tickets, setTickets] = useState([
+  const [tickets] = useState([
     { id: 1, title: 'Instalación CCTV Hotel', priority: 'Alta', status: 'En Progreso', client: 'Hotel Marriott' },
     { id: 2, title: 'Mantenimiento Alarma', priority: 'Media', status: 'Pendiente', client: 'Banco Galicia' },
     { id: 3, title: 'Cableado Red Completo', priority: 'Alta', status: 'Completado', client: 'Carrefour' }
@@ -383,7 +411,7 @@ function TicketsPanel({ isOpen, onClose, theme }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-gray-900/95 backdrop-blur-xl border-l border-cyan-500/30 shadow-2xl z-40 transform transition-transform duration-300">
+    <div className="fixed right-0 top-0 h-full w-96 bg-gray-900/95 backdrop-blur-xl border-l border-cyan-500/30 shadow-2xl z-40">
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -429,9 +457,6 @@ function TicketsPanel({ isOpen, onClose, theme }) {
   );
 }
 
-// ============================================================================
-// MODAL DE CONFIGURACIÓN
-// ============================================================================
 function ConfigModal({ isOpen, onClose, config, setConfig, currentTheme, onThemeChange }) {
   if (!isOpen) return null;
 
@@ -451,7 +476,6 @@ function ConfigModal({ isOpen, onClose, config, setConfig, currentTheme, onTheme
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Tema */}
           <div>
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Palette className="w-5 h-5" />
@@ -475,7 +499,6 @@ function ConfigModal({ isOpen, onClose, config, setConfig, currentTheme, onTheme
             </div>
           </div>
 
-          {/* Voz */}
           <div>
             <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
               <Volume2 className="w-5 h-5" />
@@ -549,12 +572,17 @@ export default function InfratecCRMFuturistic() {
   const [chamiMinimized, setChamiMinimized] = useState(false);
   const [ticketsPanelOpen, setTicketsPanelOpen] = useState(false);
   const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [chamiConfig, setChamiConfig] = useState({
     voiceGender: 'female',
     voiceSpeed: 1.0,
     voicePitch: 1.0,
     muted: false
   });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [usersOnline] = useState([
     { name: 'Juan Martín', role: 'Admin', status: 'online', dept: 'Administración' },
@@ -588,22 +616,21 @@ export default function InfratecCRMFuturistic() {
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${currentTheme.bg}`}>
-      {/* Chami Flotante */}
-      <FloatingChamiPanel
-        isMinimized={chamiMinimized}
-        onToggle={() => setChamiMinimized(!chamiMinimized)}
-        theme={currentTheme}
-        config={chamiConfig}
-      />
+      {mounted && (
+        <FloatingChamiPanel
+          isMinimized={chamiMinimized}
+          onToggle={() => setChamiMinimized(!chamiMinimized)}
+          theme={currentTheme}
+          config={chamiConfig}
+        />
+      )}
 
-      {/* Panel de Tickets */}
       <TicketsPanel
         isOpen={ticketsPanelOpen}
         onClose={() => setTicketsPanelOpen(false)}
         theme={currentTheme}
       />
 
-      {/* Modal de Configuración */}
       <ConfigModal
         isOpen={configModalOpen}
         onClose={() => setConfigModalOpen(false)}
@@ -613,7 +640,6 @@ export default function InfratecCRMFuturistic() {
         onThemeChange={setCurrentTheme}
       />
 
-      {/* Sidebar */}
       <div className={`fixed left-0 top-0 h-full bg-gray-900/95 backdrop-blur-xl border-r border-cyan-500/30 transition-all duration-300 z-40 ${
         sidebarOpen ? 'w-64' : 'w-20'
       }`}>
@@ -668,9 +694,7 @@ export default function InfratecCRMFuturistic() {
         </button>
       </div>
 
-      {/* Main Content */}
       <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'} ${ticketsPanelOpen ? 'mr-96' : ''}`}>
-        {/* Header */}
         <header className="bg-gray-900/50 backdrop-blur-sm border-b border-cyan-500/30 sticky top-0 z-30">
           <div className="px-8 py-4 flex items-center justify-between">
             <div>
@@ -711,18 +735,15 @@ export default function InfratecCRMFuturistic() {
           </div>
         </header>
 
-        {/* Content */}
         <main className="p-8">
           {activeModule === 'dashboard' && (
             <div className="space-y-6">
-              {/* Stats */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {dashboardStats.map((stat, i) => {
                   const Icon = stat.icon;
                   return (
                     <div key={i} className="relative group">
-                      <div className="absolute inset-0 bg-gradient-to-br opacity-10 group-hover:opacity-20 transition-opacity rounded-xl blur-xl" 
-                           style={{ background: `linear-gradient(to bottom right, ${currentTheme.glow}, transparent)` }} />
+                      <div className="absolute inset-0 bg-gradient-to-br opacity-10 group-hover:opacity-20 transition-opacity rounded-xl blur-xl" />
                       <div className={`relative bg-gradient-to-br ${stat.color} p-6 rounded-xl shadow-xl border border-white/10 hover:scale-105 transition-transform`}>
                         <div className="flex items-start justify-between mb-4">
                           <Icon className="w-8 h-8 text-white/90" />
@@ -736,7 +757,6 @@ export default function InfratecCRMFuturistic() {
                 })}
               </div>
 
-              {/* Departamentos */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {departments.map(dept => {
                   const Icon = dept.icon;
@@ -770,7 +790,6 @@ export default function InfratecCRMFuturistic() {
                 })}
               </div>
 
-              {/* Usuarios Online */}
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-cyan-500/30 p-6">
                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                   <Activity className="w-6 h-6 text-cyan-400" />
@@ -816,7 +835,6 @@ export default function InfratecCRMFuturistic() {
         </main>
       </div>
 
-      {/* Estilos globales */}
       <style jsx>{`
         @keyframes pulse-slow {
           0%, 100% { opacity: 1; }
