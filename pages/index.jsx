@@ -1,29 +1,297 @@
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
-  const { messages, ctx } = req.body;
-  const key = process.env.ANTHROPIC_API_KEY;
+import { useState, useRef, useEffect } from 'react';
+import { Brain, Ticket, Settings, Zap, Shield, Activity, LogOut,
+         Plus, Trash2, Edit2, X, Send, BarChart3, ChevronRight,
+         Mic, MicOff, FileText, Upload, Cloud, DollarSign,
+         Minimize2, Maximize2, GripVertical, RefreshCw } from 'lucide-react';
 
-  if (!key) {
-    const fb = ['Claro, lo proceso ahora mismo. ¿Algo más?','Anotado, ¿seguimos?','Dale, entendido. ¿Qué más necesitás?','Perfecto, lo gestiono ya.'];
-    return res.json({ text: fb[Math.floor(Math.random()*fb.length)] });
+// ── TEMAS (15 colores) ──────────────────────────────────────────────────────
+const TEMAS = {
+  cian:     { id:'cian',     n:'🔵 Cian Neon',     p:'#00d4ff', s:'#004488', bg:'#050810', panel:'rgba(0,212,255,0.07)',   border:'rgba(0,212,255,0.3)',   glow:'0 0 25px rgba(0,212,255,0.5)'   },
+  violeta:  { id:'violeta',  n:'🟣 Violeta',        p:'#c060ff', s:'#440088', bg:'#080510', panel:'rgba(192,96,255,0.07)',  border:'rgba(192,96,255,0.3)',  glow:'0 0 25px rgba(192,96,255,0.5)'  },
+  verde:    { id:'verde',    n:'🟢 Verde Matrix',   p:'#00ff88', s:'#004422', bg:'#040a06', panel:'rgba(0,255,136,0.07)',   border:'rgba(0,255,136,0.3)',   glow:'0 0 25px rgba(0,255,136,0.5)'   },
+  rojo:     { id:'rojo',     n:'🔴 Rojo Fuego',     p:'#ff4060', s:'#880022', bg:'#0a0405', panel:'rgba(255,64,96,0.07)',   border:'rgba(255,64,96,0.3)',   glow:'0 0 25px rgba(255,64,96,0.5)'   },
+  dorado:   { id:'dorado',   n:'🟡 Dorado',         p:'#ffd700', s:'#664400', bg:'#090700', panel:'rgba(255,215,0,0.07)',   border:'rgba(255,215,0,0.3)',   glow:'0 0 25px rgba(255,215,0,0.5)'   },
+  naranja:  { id:'naranja',  n:'🟠 Naranja',        p:'#ff8800', s:'#662200', bg:'#0a0600', panel:'rgba(255,136,0,0.07)',   border:'rgba(255,136,0,0.3)',   glow:'0 0 25px rgba(255,136,0,0.5)'   },
+  rosa:     { id:'rosa',     n:'🩷 Rosa Neon',      p:'#ff40aa', s:'#880044', bg:'#0a0508', panel:'rgba(255,64,170,0.07)',  border:'rgba(255,64,170,0.3)',  glow:'0 0 25px rgba(255,64,170,0.5)'  },
+  blanco:   { id:'blanco',   n:'⚪ Blanco Hielo',   p:'#e0f0ff', s:'#334455', bg:'#050a10', panel:'rgba(224,240,255,0.06)', border:'rgba(224,240,255,0.2)', glow:'0 0 25px rgba(224,240,255,0.4)' },
+  turquesa: { id:'turquesa', n:'🩵 Turquesa',       p:'#00ffcc', s:'#003344', bg:'#04080a', panel:'rgba(0,255,204,0.07)',   border:'rgba(0,255,204,0.3)',   glow:'0 0 25px rgba(0,255,204,0.5)'   },
+  indigo:   { id:'indigo',   n:'💜 Índigo',         p:'#6666ff', s:'#222288', bg:'#050510', panel:'rgba(102,102,255,0.07)', border:'rgba(102,102,255,0.3)', glow:'0 0 25px rgba(102,102,255,0.5)' },
+  esmeralda:{ id:'esmeralda',n:'💚 Esmeralda',      p:'#00cc66', s:'#003322', bg:'#030807', panel:'rgba(0,204,102,0.07)',   border:'rgba(0,204,102,0.3)',   glow:'0 0 25px rgba(0,204,102,0.5)'   },
+  coral:    { id:'coral',    n:'🪸 Coral',          p:'#ff6644', s:'#882200', bg:'#0a0503', panel:'rgba(255,102,68,0.07)',  border:'rgba(255,102,68,0.3)',  glow:'0 0 25px rgba(255,102,68,0.5)'  },
+  plateado: { id:'plateado', n:'🩶 Plateado',       p:'#aabbcc', s:'#223344', bg:'#070a0c', panel:'rgba(170,187,204,0.07)',border:'rgba(170,187,204,0.3)', glow:'0 0 25px rgba(170,187,204,0.4)' },
+  amarillo: { id:'amarillo', n:'🌟 Amarillo Sol',   p:'#ffee00', s:'#554400', bg:'#090800', panel:'rgba(255,238,0,0.07)',  border:'rgba(255,238,0,0.3)',  glow:'0 0 25px rgba(255,238,0,0.5)'  },
+  plasma:   { id:'plasma',   n:'⚡ Plasma',         p:'#ff00ff', s:'#550055', bg:'#080008', panel:'rgba(255,0,255,0.07)',   border:'rgba(255,0,255,0.3)',   glow:'0 0 25px rgba(255,0,255,0.5)'   },
+};
+
+const USERS_DB = [
+  { id:1, user:'admin',    pass:'admin123', rol:'ADMIN',          nombre:'Juan Martín' },
+  { id:2, user:'oficina',  pass:'ofic456',  rol:'ADMINISTRACION', nombre:'María García' },
+  { id:3, user:'tecnico1', pass:'tec789',   rol:'TECNICO',        nombre:'Carlos López' },
+];
+
+const TICKETS_INIT = [
+  { id:1, titulo:'Cámara sin señal - Palermo', cliente:'Supermercado Norte', estado:'Pendiente', prioridad:'Alta',  tecnico:'Carlos López', fecha:'2026-05-10', desc:'Cámara IP exterior sin imagen.' },
+  { id:2, titulo:'Alarma activada en falso',   cliente:'Farmacia Central',   estado:'En curso',  prioridad:'Media', tecnico:'Carlos López', fecha:'2026-05-12', desc:'Sensor de movimiento mal calibrado.' },
+  { id:3, titulo:'Instalación red WiFi',       cliente:'Oficina Belgrano',   estado:'Resuelto',  prioridad:'Baja',  tecnico:'Carlos López', fecha:'2026-05-08', desc:'Router instalado y configurado.' },
+  { id:4, titulo:'Mantenimiento CCTV mensual', cliente:'Banco Provincia',    estado:'Pendiente', prioridad:'Media', tecnico:'',             fecha:'2026-05-15', desc:'Revisión preventiva de cámaras.' },
+];
+
+const AGENTES_INIT = [
+  { id:1, nombre:'Chami',   rol:'Asistente General', estado:'activo', personalidad:'amigable',   departamento:'General' },
+  { id:2, nombre:'TechBot', rol:'Soporte Técnico',   estado:'activo', personalidad:'preciso',    departamento:'Técnico' },
+  { id:3, nombre:'SalesAI', rol:'Ventas',            estado:'pausa',  personalidad:'persuasivo', departamento:'Comercial' },
+];
+
+const DOCS_INIT = [
+  { id:1, nombre:'Contrato CCTV Tipo A.pdf', tipo:'Contrato', fecha:'2026-05-01', size:'245 KB' },
+  { id:2, nombre:'Presupuesto Alarma Q2.xlsx', tipo:'Presupuesto', fecha:'2026-05-10', size:'88 KB' },
+];
+
+const ESTADO_COLOR = { 'Pendiente':'#ffaa00','En curso':'#00aaff','Resuelto':'#00ff88','Cancelado':'#ff4444' };
+const VOICE_STATES = { normal:{ rate:1.05, pitch:1.1, label:'Normal' }, calma:{ rate:0.85, pitch:0.9, label:'Calma' }, energica:{ rate:1.25, pitch:1.3, label:'Enérgica' } };
+
+function gridBg(t) {
+  return { backgroundImage:`repeating-linear-gradient(${t.border} 0 1px,transparent 1px 100%),repeating-linear-gradient(90deg,${t.border} 0 1px,transparent 1px 100%)`, backgroundSize:'40px 40px' };
+}
+
+// ── 6 TIPOS DE ESFERA ──────────────────────────────────────────────────────
+
+function SphereRings({ sz, t, hablando }) {
+  const rings = [sz, sz*0.8, sz*0.6, sz*0.4];
+  return (
+    <div className="relative flex items-center justify-center" style={{width:sz,height:sz}}>
+      {rings.map((r,i)=>(
+        <div key={i} className={`absolute rounded-full ${hablando?'animate-ping':''}`}
+          style={{width:r,height:r,border:`1px solid ${t.p}`,opacity:hablando?0.06+i*0.06:0.03+i*0.03,
+            animationDelay:`${i*0.25}s`,animationDuration:'2s'}}/>
+      ))}
+      <div className={`rounded-full flex items-center justify-center ${hablando?'animate-pulse':''}`}
+        style={{width:sz*0.4,height:sz*0.4,background:`radial-gradient(circle at 33% 28%, ${t.s}cc, #00000099)`,
+          boxShadow:`${t.glow},inset 0 0 30px ${t.s}66`,border:`2px solid ${t.p}`}}>
+        <Brain style={{width:sz*0.22,height:sz*0.22,color:t.p,filter:`drop-shadow(0 0 6px ${t.p})`}}/>
+      </div>
+    </div>
+  );
+}
+
+function SphereParticles({ sz, t, hablando }) {
+  const dots = [];
+  const n = 120;
+  for (let i=0; i<n; i++) {
+    const phi = Math.acos(-1 + (2*i)/n);
+    const theta = Math.sqrt(n*Math.PI)*phi;
+    const x = (Math.sin(phi)*Math.cos(theta)*0.5+0.5)*100;
+    const y = (Math.sin(phi)*Math.sin(theta)*0.5+0.5)*100;
+    const z = Math.cos(phi);
+    const opacity = (z+1)/2;
+    const dsize = 1.5 + opacity*2;
+    dots.push({x,y,opacity:0.3+opacity*0.7,dsize});
+  }
+  return (
+    <div className="relative" style={{width:sz,height:sz}}>
+      <div className={`absolute inset-0 rounded-full ${hablando?'animate-pulse':''}`}
+        style={{background:`radial-gradient(circle, ${t.s}44, transparent)`,boxShadow:t.glow}}/>
+      <svg width={sz} height={sz} viewBox="0 0 100 100">
+        {dots.map((d,i)=>(
+          <circle key={i} cx={d.x} cy={d.y} r={d.dsize/2} fill={t.p} opacity={d.opacity*(hablando?1:0.6)}/>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function SphereFace({ sz, t, hablando }) {
+  return (
+    <div className="relative" style={{width:sz,height:sz}}>
+      <div className={`absolute inset-0 rounded-full ${hablando?'animate-pulse':''}`}
+        style={{background:`radial-gradient(circle at 40% 30%, ${t.s}55, transparent)`,boxShadow:t.glow}}/>
+      <svg width={sz} height={sz} viewBox="0 0 100 120" style={{filter:`drop-shadow(0 0 4px ${t.p})`}}>
+        {/* Grid lines */}
+        {[20,35,50,65,80].map(y=><line key={`h${y}`} x1="15" y1={y} x2="85" y2={y} stroke={t.p} strokeWidth="0.3" opacity="0.25"/>)}
+        {[25,37,50,63,75].map(x=><line key={`v${x}`} x1={x} y1="10" x2={x} y2="110" stroke={t.p} strokeWidth="0.3" opacity="0.25"/>)}
+        {/* Head outline */}
+        <path d="M30,15 Q50,8 70,15 L75,55 Q72,85 50,95 Q28,85 25,55 Z" fill="none" stroke={t.p} strokeWidth="1.2" opacity="0.9"/>
+        {/* Eyes */}
+        <ellipse cx="38" cy="40" rx="6" ry="4" fill="none" stroke={t.p} strokeWidth="1"/>
+        <circle cx="38" cy="40" r="2" fill={t.p} opacity="0.8"/>
+        <ellipse cx="62" cy="40" rx="6" ry="4" fill="none" stroke={t.p} strokeWidth="1"/>
+        <circle cx="62" cy="40" r="2" fill={t.p} opacity="0.8"/>
+        {/* Nose */}
+        <path d="M50,48 L46,60 Q50,63 54,60 Z" fill="none" stroke={t.p} strokeWidth="0.9"/>
+        {/* Mouth - animates when speaking */}
+        <path d={hablando?"M38,72 Q50,82 62,72":"M38,72 Q50,76 62,72"}
+          fill="none" stroke={t.p} strokeWidth="1.3" strokeLinecap="round"/>
+        {hablando && <ellipse cx="50" cy="75" rx="8" ry="4" fill={t.p} opacity="0.15"/>}
+        {/* Ear lines */}
+        <path d="M25,45 L18,48 L18,55 L25,58" fill="none" stroke={t.p} strokeWidth="0.8" opacity="0.6"/>
+        <path d="M75,45 L82,48 L82,55 L75,58" fill="none" stroke={t.p} strokeWidth="0.8" opacity="0.6"/>
+        {/* Neck */}
+        <path d="M42,95 L40,110 M58,95 L60,110 M40,108 L60,108" fill="none" stroke={t.p} strokeWidth="0.8" opacity="0.5"/>
+        {/* Connection dots */}
+        {[[30,15],[70,15],[75,55],[50,95],[25,55]].map(([x,y],i)=>(
+          <circle key={i} cx={x} cy={y} r="1.5" fill={t.p} opacity="0.8"/>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function SphereHolo({ sz, t, hablando }) {
+  const [rot, setRot] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setRot(r => (r+1)%360), 30);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="relative flex items-center justify-center" style={{width:sz,height:sz}}>
+      <div className="absolute inset-0 rounded-full" style={{
+        background:`conic-gradient(from ${rot}deg, ${t.p}00, ${t.p}88, ${t.p}00, ${t.s}cc, ${t.p}00)`,
+        boxShadow:t.glow, opacity: hablando?1:0.7}}/>
+      <div className="absolute inset-2 rounded-full" style={{
+        background:`conic-gradient(from ${-rot*1.5}deg, transparent, ${t.p}44, transparent)`,
+        border:`1px solid ${t.p}55`}}/>
+      <Brain style={{width:sz*0.28,height:sz*0.28,color:t.p,zIndex:1,filter:`drop-shadow(0 0 8px ${t.p})`}}/>
+    </div>
+  );
+}
+
+function SphereGeo({ sz, t, hablando }) {
+  const pts = [[50,5],[95,27],[95,73],[50,95],[5,73],[5,27]];
+  const lines = [[0,1],[1,2],[2,3],[3,4],[4,5],[5,0],[0,2],[1,3],[2,4],[3,5],[4,0],[5,1]];
+  return (
+    <div className={`relative ${hablando?'animate-pulse':''}`} style={{width:sz,height:sz}}>
+      <div className="absolute inset-0 rounded-full" style={{background:`radial-gradient(circle, ${t.s}66, transparent)`,boxShadow:t.glow}}/>
+      <svg width={sz} height={sz} viewBox="0 0 100 100">
+        {lines.map(([a,b],i)=>(
+          <line key={i} x1={pts[a][0]} y1={pts[a][1]} x2={pts[b][0]} y2={pts[b][1]}
+            stroke={t.p} strokeWidth="0.8" opacity={hablando?0.9:0.5}/>
+        ))}
+        {pts.map(([x,y],i)=>(
+          <circle key={i} cx={x} cy={y} r="2.5" fill={t.p} opacity={hablando?1:0.7}/>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function SpherePulse({ sz, t, hablando }) {
+  return (
+    <div className="relative flex items-center justify-center" style={{width:sz,height:sz}}>
+      {hablando && [1,0.75,0.5].map((s,i)=>(
+        <div key={i} className="absolute rounded-full animate-ping"
+          style={{width:sz*s,height:sz*s,background:t.p,opacity:0.08,animationDelay:`${i*0.3}s`}}/>
+      ))}
+      <div className={`rounded-full ${hablando?'animate-pulse':''}`}
+        style={{width:sz*0.7,height:sz*0.7,background:`radial-gradient(circle at 35% 25%, ${t.p}99, ${t.s}cc)`,
+          boxShadow:`${t.glow},0 0 60px ${t.p}44`,border:`2px solid ${t.p}`}}>
+      </div>
+      <Brain className="absolute" style={{width:sz*0.3,height:sz*0.3,color:'#fff',filter:`drop-shadow(0 0 6px ${t.p})`}}/>
+    </div>
+  );
+}
+
+const SPHERE_COMPONENTS = { rings:SphereRings, particles:SphereParticles, face:SphereFace, holo:SphereHolo, geo:SphereGeo, pulse:SpherePulse };
+const SPHERE_LABELS = { rings:'🔵 Anillos', particles:'✨ Partículas', face:'👤 Cara', holo:'🌀 Holograma', geo:'💎 Geométrica', pulse:'⚡ Pulso' };
+
+// ── ESFERA FLOTANTE DRAGGABLE ──────────────────────────────────────────────
+function FloatingSphere({ tema, hablando, tipoEsfera, onAbrirChat, escuchando }) {
+  const [pos, setPos] = useState({ x: typeof window!=='undefined'?window.innerWidth-180:800, y: typeof window!=='undefined'?window.innerHeight-200:500 });
+  const [sz, setSz] = useState(130);
+  const [mini, setMini] = useState(false);
+  const dragging = useRef(false);
+  const off = useRef({x:0,y:0});
+
+  useEffect(() => {
+    function move(e) {
+      if (!dragging.current) return;
+      const cx = e.touches?.[0]?.clientX ?? e.clientX;
+      const cy = e.touches?.[0]?.clientY ?? e.clientY;
+      setPos({ x: cx-off.current.x, y: cy-off.current.y });
+    }
+    function up() { dragging.current = false; }
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    window.addEventListener('touchmove', move, {passive:true});
+    window.addEventListener('touchend', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      window.removeEventListener('touchmove', move);
+      window.removeEventListener('touchend', up);
+    };
+  }, []);
+
+  function startDrag(e) {
+    dragging.current = true;
+    const cx = e.touches?.[0]?.clientX ?? e.clientX;
+    const cy = e.touches?.[0]?.clientY ?? e.clientY;
+    off.current = { x: cx-pos.x, y: cy-pos.y };
   }
 
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 250,
-        system: `Sos Chami, la IA principal de INFRATEC, empresa de seguridad electrónica en Buenos Aires Argentina. Hablás en español rioplatense usando "vos". Sos muy humano, cálido, directo y conciso (máximo 2 oraciones). Nunca decís que sos una IA a menos que te pregunten. Contexto del sistema: ${ctx}`,
-        messages,
-      }),
-    });
-    const d = await r.json();
-    res.json({ text: d.content?.[0]?.text || 'Perdón, ¿me repetís?' });
-  } catch {
-    res.json({ text: 'Che, tuve un problema de conexión. Intentalo de nuevo.' });
-  }
+  const SphereComp = SPHERE_COMPONENTS[tipoEsfera] || SphereRings;
+  const totalSz = mini ? 56 : sz;
+
+  return (
+    <div style={{ position:'fixed', left:pos.x, top:pos.y, zIndex:9999, userSelect:'none', touchAction:'none' }}>
+      {/* Controles */}
+      {!mini && (
+        <div className="flex gap-1 mb-1 justify-center">
+          <button onClick={()=>setSz(s=>Math.max(80,s-20))} className="w-6 h-6 rounded text-xs flex items-center justify-center"
+            style={{background:tema.panel,border:`1px solid ${tema.border}`,color:tema.p}}>−</button>
+          <button onClick={()=>setSz(s=>Math.min(200,s+20))} className="w-6 h-6 rounded text-xs flex items-center justify-center"
+            style={{background:tema.panel,border:`1px solid ${tema.border}`,color:tema.p}}>+</button>
+          <button onClick={()=>setMini(true)} className="w-6 h-6 rounded flex items-center justify-center"
+            style={{background:tema.panel,border:`1px solid ${tema.border}`,color:tema.p}}>
+            <Minimize2 style={{width:10,height:10}}/>
+          </button>
+        </div>
+      )}
+
+      {/* Sphere */}
+      <div onMouseDown={startDrag} onTouchStart={startDrag}
+        className="cursor-move relative" style={{ width:totalSz, height:totalSz }}
+        onClick={mini?()=>setMini(false):undefined}>
+        {mini ? (
+          <div className={`w-full h-full rounded-full flex items-center justify-center ${hablando?'animate-pulse':''}`}
+            style={{background:`radial-gradient(circle, ${tema.s}, #000)`,border:`2px solid ${tema.p}`,boxShadow:tema.glow}}>
+            <Brain style={{width:24,height:24,color:tema.p}}/>
+          </div>
+        ) : (
+          <SphereComp sz={sz} t={tema} hablando={hablando||escuchando}/>
+        )}
+        {/* Status indicator */}
+        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-center" style={{whiteSpace:'nowrap'}}>
+          {!mini && (
+            <span className="text-xs font-mono px-2 py-0.5 rounded-full"
+              style={{background:'rgba(0,0,0,0.8)',color:escuchando?'#ff4444':hablando?'#00ff88':tema.p,fontSize:9}}>
+              {escuchando?'● ESCUCHANDO':hablando?'◉ HABLANDO':'● EN ESPERA'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Chat button */}
+      {!mini && (
+        <button onClick={onAbrirChat} className="mt-2 w-full py-1 rounded-lg text-xs font-mono"
+          style={{background:tema.p,color:'#000',boxShadow:tema.glow}}>
+          💬 Hablar
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── TYPING DOTS ────────────────────────────────────────────────────────────
+function TypingDots({ tema }) {
+  return (
+    <div className="flex items-center gap-1 px-4 py-3 rounded-2xl"
+      style={{background:tema.panel,border:`1px solid ${tema.border}`}}>
+      {[0,1,2].map(i=>(
+        <div key={i} className="w-2 h-2 rounded-full animate-bounce"
+          style={{background:tema.p,animationDelay:`${i*0.18}s`}}/>
+      ))}
+    </div>
+  );
 }
 // ── CHAMI ASSISTANT ────────────────────────────────────────────────────────
 function ChamiAssistant({ tema, usuario, rol, tickets, agentes, setAgentes, setTickets, tipoEsfera, setTipoEsfera, voiceState, setVoiceState, voces, vozSel, setVozSel }) {
